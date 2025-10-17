@@ -1,6 +1,6 @@
 import pytest
-from src.kademlia.http_kad.routing import RoutingTable, KBucket
-from src.kademlia.http_kad.utils import Node, random_node_id
+from src.kademlia.kademlia.routing import RoutingTable, KBucket
+from src.kademlia.kademlia.utils import Node, random_node_id
 
 
 @pytest.fixture

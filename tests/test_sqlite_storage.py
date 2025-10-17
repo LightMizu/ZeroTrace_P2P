@@ -1,7 +1,7 @@
 import time
 import pytest
-from src.kademlia.http_kad.persistent_storage import SQLiteStorage
-from src.kademlia.http_kad.utils import Node, digest
+from src.kademlia.kademlia.persistent_storage import SQLiteStorage
+from src.kademlia.kademlia.utils import Node, digest
 
 
 @pytest.fixture

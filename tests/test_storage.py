@@ -1,4 +1,4 @@
-from src.kademlia.http_kad.storage import ForgetfulStorage
+from src.kademlia.kademlia.storage import ForgetfulStorage
 import time
 
 

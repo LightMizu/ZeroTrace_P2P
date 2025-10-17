@@ -39,9 +39,6 @@ class SQLiteStorage:
             db_path =f"sqlite:///file:{random_node_id().hex()}?mode=memory&cache=shared&uri=true"
         else:
             db_path = f"sqlite:///{db_path}"
-        # Для shared in-memory SQLite можно использовать:
-        # db_path = "sqlite:///file:memdb1?mode=memory&cache=shared&uri=true"
-        # но это нужно только если база должна шариться между потоками.
 
         self.engine = create_engine(db_path, connect_args={"check_same_thread": False})
         Base.metadata.create_all(self.engine)
@@ -119,14 +116,14 @@ class SQLiteStorage:
         min_birthday = time.monotonic() - seconds_old
         with self.Session() as session:
             for kv in session.query(KVStore).filter(KVStore.timestamp < min_birthday):
-                data = json.loads(kv.value)
+                data = json.loads(str(kv.value))
                 yield kv.key, bytes.fromhex(data['value']) if data['is_bytes'] else data['value']
 
     def __iter__(self):
         self.cull()
         with self.Session() as session:
             for kv in session.query(KVStore).all():
-                data = json.loads(kv.value)
+                data = json.loads(str(kv.value))
                 yield kv.key, bytes.fromhex(data['value']) if data['is_bytes'] else data['value']
 
     def clear(self):

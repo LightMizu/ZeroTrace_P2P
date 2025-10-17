@@ -1,6 +1,6 @@
 import hashlib
-import random
-
+import secrets
+from hashlib import sha1
 
 def digest(data: bytes) -> bytes:
     if isinstance(data, str):
@@ -26,4 +26,8 @@ class Node:
 
 
 def random_node_id() -> bytes:
-    return digest(bytes(random.getrandbits(8) for _ in range(20)))
+    """
+    Генерирует криптографически безопасный 20-байтный идентификатор узла.
+    """
+    random_bytes = secrets.token_bytes(20)  # 20 случайных байт
+    return sha1(random_bytes).digest() 
