@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from src.kademlia.kademlia.server import create_app
-from src.kademlia.kademlia.utils import random_node_id, digest
+from src.zerotrace.kademlia.server import create_app
+from src.zerotrace.kademlia.utils import random_node_id, digest
 from .mocks import MockSQLiteStorage
 
 
@@ -11,7 +11,7 @@ def mock_network():
     """Create a test network with 5 nodes using mocked storage."""
     storage = MockSQLiteStorage()
     
-    with patch('src.kademlia.kademlia.server.SQLiteStorage', return_value=storage):
+    with patch('src.zerotrace.kademlia.server.SQLiteStorage', return_value=storage):
         ports = [9200, 9201, 9202, 9203, 9204]
         apps = [create_app(p) for p in ports]
         clients = [TestClient(a) for a in apps]

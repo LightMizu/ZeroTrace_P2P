@@ -1,4 +1,4 @@
-from src.kademlia.kademlia.storage import ForgetfulStorage
+from src.zerotrace.kademlia.storage import ForgetfulStorage
 import time
 
 

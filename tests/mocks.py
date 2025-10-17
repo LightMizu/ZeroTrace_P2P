@@ -3,7 +3,7 @@ from typing import Iterator, Tuple, Optional, Any, Dict, TYPE_CHECKING
 from collections import defaultdict
 
 if TYPE_CHECKING:
-    from src.kademlia.kademlia.utils import Node
+    from src.zerotrace.kademlia.utils import Node
 
 
 class MockSQLiteStorage:
@@ -113,7 +113,7 @@ class MockSQLiteStorage:
         Returns:
             List of Node instances
         """
-        from src.kademlia.kademlia.utils import Node
+        from src.zerotrace.kademlia.utils import Node
         
         now = time.monotonic()
         result = []

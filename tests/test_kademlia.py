@@ -1,8 +1,8 @@
 import pytest
 import time
 from fastapi.testclient import TestClient
-from src.kademlia.kademlia.server import create_app
-from src.kademlia.kademlia.utils import random_node_id
+from src.zerotrace.kademlia.server import create_app
+from src.zerotrace.kademlia.utils import random_node_id
 
 @pytest.fixture
 def kademlia_nodes(tmp_path):
@@ -23,7 +23,7 @@ def kademlia_nodes(tmp_path):
     for client in clients:
         client.close()
     # Clear the app cache from server.py
-    from src.kademlia.kademlia.server import _app_cache
+    from src.zerotrace.kademlia.server import _app_cache
     _app_cache.clear()
 
 def test_ping_add_new_node(kademlia_nodes):
