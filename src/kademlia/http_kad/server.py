@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-
-from .utils import Node, random_node_id, digest
+from typing import Optional
+from .utils import Node, random_node_id
 from .persistent_storage import SQLiteStorage
 from .routing import RoutingTable
 
@@ -35,17 +35,13 @@ class FindValueRequest(BaseModel):
 
 
 class Server:
-    def __init__(self, port: int, ksize: int = 20, alpha: int = 3, db_path: str = None):
+    def __init__(self, port: int, ksize: int = 20, alpha: int = 3, db_path: Optional[str] = None):
         self.ksize = ksize
         self.alpha = alpha
         # Default to a memory-backed sqlite URI to avoid creating files on disk when
         # no explicit db_path is provided. Use port in the name to keep per-server DBs
         # separate while still being in-memory.
-        if db_path:
-            db_name = db_path
-        else:
-            db_name = f"file:kademlia_{port}?mode=memory&cache=shared"
-        self.storage = SQLiteStorage(db_name)
+        self.storage = SQLiteStorage(db_path)
         self.node = Node(random_node_id(), "127.0.0.1", port)
         self.protocol = None
         self.routing = RoutingTable(self, self.ksize, self.node)

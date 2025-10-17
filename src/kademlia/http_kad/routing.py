@@ -63,9 +63,20 @@ class KBucket:
         return True
 
     def depth(self):
-        vals = self.nodes.values()
-        # fallback depth calculation
-        return 0
+        vals = list(self.nodes.values())
+        if len(vals) < 2:
+            return 160  # максимальная глубина для SHA1
+
+        first = vals[0].long_id
+        depth = 0
+        for bit in range(160):
+            mask = 1 << (159 - bit)
+            bit_val = first & mask
+            if all((n.long_id & mask) == bit_val for n in vals):
+                depth += 1
+            else:
+                break
+        return depth
 
     def head(self):
         return list(self.nodes.values())[0]

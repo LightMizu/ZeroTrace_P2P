@@ -2,7 +2,7 @@ import pytest
 import time
 from fastapi.testclient import TestClient
 from src.kademlia.http_kad.server import create_app
-from src.kademlia.http_kad.utils import random_node_id, digest
+from src.kademlia.http_kad.utils import random_node_id
 
 @pytest.fixture
 def kademlia_nodes(tmp_path):
