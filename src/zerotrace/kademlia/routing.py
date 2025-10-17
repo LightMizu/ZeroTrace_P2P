@@ -5,6 +5,7 @@ from collections import OrderedDict
 from itertools import chain
 
 from .utils import Node
+from zerotrace.kademlia.logging import default_logger
 
 
 class KBucket:
@@ -30,6 +31,8 @@ class KBucket:
         for node in nodes:
             bucket = one if node.long_id <= midpoint else two
             bucket.add_node(node)
+        if default_logger:
+            default_logger.log("SPLIT", operation="split_bucket", range_one=f"{one.range}", range_two=f"{two.range}")
         return (one, two)
 
     def remove_node(self, node: Node):
@@ -40,6 +43,8 @@ class KBucket:
             if self.replacement_nodes:
                 newnode_id, newnode = self.replacement_nodes.popitem()
                 self.nodes[newnode_id] = newnode
+        if default_logger:
+            default_logger.log("REMOVE", operation="remove_node", node_id=node.id.hex())
 
     def has_in_range(self, node: Node):
         return self.range[0] <= node.long_id <= self.range[1]
