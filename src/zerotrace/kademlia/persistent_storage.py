@@ -6,7 +6,6 @@ from sqlalchemy import (
     create_engine, Column, String, Integer, Float, LargeBinary, Text
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.exc import NoResultFound
 
 from .utils import Node, random_node_id
 
