@@ -24,12 +24,14 @@ class SecureMessenger:
     signature_public_key: bytes
     __signature_private_key: bytes
     identifier: str
+    ip: str
 
-    def __init__(self):
+    def __init__(self, ip):
         self.__quantum = PostQuantumCrypto()
         self.__symmetric = SymmetricCrypto()
-        self.__api = API()
+        self.ip = ip
         self.__signature = PostQuantumSignature()
+
 
     def generate_keys(self) -> Tuple[bytes, bytes]:
         kem_private_key, kem_public_key, signature_private_key, signature_public_key = (
@@ -112,6 +114,7 @@ class SecureMessenger:
         #Шаг 0: Подготовка сообщения
         message_payload = json.dumps(
                 {
+                    "ip":self.ip,
                     "message": b64_enc(message),
                     "sender_id": key_pair_id_base64url(
                         kem_pub=self.kem_public_key,
@@ -193,6 +196,7 @@ class SecureMessenger:
             "sender_id": calculated_id,
             "message": b64_dec(message_payload["message"]),
             "signature_public_key": message_payload["signature_public_key"],
+            "sender_dest": message_payload["ip"],
             "kem_public_key": message_payload["kem_public_key"],
             "timestamp": message_payload["timestamp"]
         } 

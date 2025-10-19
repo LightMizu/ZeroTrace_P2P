@@ -1,4 +1,6 @@
-from sqlalchemy import Column, String, Integer
+from time import timezone
+from sqlalchemy import Column, Float, String, Integer, func, DateTime
+from sqlalchemy.engine import create
 from sqlalchemy.orm import declarative_base
 from typing import TypedDict, Mapping, Literal
 # Базовый класс для моделей
@@ -18,12 +20,19 @@ class Contact(Base):
 
 
 
+class SeenHistory(Base):
+    __tablename__ = "seen_history"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    signature = Column(String, nullable=False,unique=True)
+    timestamp = Column(Float, server_default=func.now())
+
 class Message(Base):
     __tablename__ = "messages"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    content_b64 = Column(String, nullable=False)
+    content = Column(String, nullable=False)
     timestamp = Column(String, nullable=False)
     sender_id = Column(String, nullable=False)
+
 
 class ForwardMessage(Base):
     __tablename__ = "forward_messages"
@@ -32,6 +41,7 @@ class ForwardMessage(Base):
     shared_secret_ciphertext = Column(String, nullable=False)
     message_ciphertext = Column(String, nullable=False)
     nonce = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     signature = Column(String, unique=True, nullable=False)
 
 

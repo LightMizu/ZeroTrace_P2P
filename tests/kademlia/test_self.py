@@ -11,7 +11,7 @@ class TestSelfNode:
     @pytest.fixture
     async def server(self):
         """Create a test server instance"""
-        server = Server()
+        server = Server(address="127.0.0.1", port=8468)
         await server.listen(8468)
         yield server
         await server.stop()
@@ -19,7 +19,7 @@ class TestSelfNode:
     @pytest.fixture
     def routing_table(self):
         """Create a test routing table"""
-        return RoutingTable(digest(random.getrandbits(255)))
+        return RoutingTable(digest(random.getrandbits(255)), ksize=20, node="")
 
     @pytest.mark.asyncio
     async def test_server_start_stop(self, server):

@@ -1,54 +1,81 @@
-from sqlalchemy import select
+from sqlalchemy import select,text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from zerotrace.core.models import Contact, Message, ForwardMessage, Base
+from zerotrace.core.models import Contact, Message, ForwardMessage, SeenHistory, Base
 
-DATABASE_URL = "sqlite+aiosqlite:///zerotrace.db"
+class SeenHistoryManager:
+    """Менеджер для работы с таблицей seen_history."""
 
-engine = create_async_engine(DATABASE_URL, echo=False)
-AsyncSessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False) # type: ignore
+    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy
 
-async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    async def add_entry(self, signature: str, timestamp: float | None = None) -> SeenHistory:
+        """Добавляет новую запись, если такой signature ещё нет."""
+        async with self.SessionLocal() as session:
+            exists = await session.scalar(select(SeenHistory).filter_by(signature=signature))
+            if not exists:
+                entry = SeenHistory(signature=signature, timestamp=timestamp)
+                session.add(entry)
+                await session.commit()
+                return entry
+            return exists
+
+    async def get_entry(self, signature: str) -> SeenHistory | None:
+        """Получает запись по signature."""
+        async with self.SessionLocal() as session:
+            return await session.scalar(select(SeenHistory).filter_by(signature=signature))
 
 class ContactManager:
-    async def add_contact(self, identifier: str, kem_public_key: str , sign_public_key: str, addr: str, name: str | None = None):
-        async with AsyncSessionLocal() as session:# type: ignore
+    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy
+    async def add_contact(self, identifier: str, kem_public_key: str, sign_public_key: str, addr: str, name: str | None = None):
+        
+        async with self.SessionLocal() as session:
             exists = await session.scalar(select(Contact).filter_by(identifier=identifier))
             if not exists:
-                contact = Contact(identifier=identifier, name=name, kem_public_key=kem_public_key, sign_public_key=sign_public_key, addr=addr)
+                contact = Contact(
+                    identifier=identifier,
+                    name=name,
+                    kem_public_key=kem_public_key,
+                    sign_public_key=sign_public_key,
+                    addr=addr,
+                )
                 session.add(contact)
                 await session.commit()
                 return contact
             return exists
 
     async def get_contact(self, identifier: str) -> Contact | None:
-        async with AsyncSessionLocal() as session:# type: ignore
+        
+        async with self.SessionLocal() as session:
             return await session.scalar(select(Contact).filter_by(identifier=identifier))
 
     async def list_contacts(self) -> list[Contact]:
-        async with AsyncSessionLocal() as session:# type: ignore
+        
+        async with self.SessionLocal() as session:
             result = await session.scalars(select(Contact))
             return result.all()
 
 
 class MessageManager:
+    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy
     async def add_message(self, **kwargs) -> Message:
-        async with AsyncSessionLocal() as session:# type: ignore
+        
+        async with self.SessionLocal() as session:
             msg = Message(**kwargs)
             session.add(msg)
             await session.commit()
             return msg
 
     async def get_message(self, sender_id: str) -> Message | None:
-        async with AsyncSessionLocal() as session:# type: ignore
+        
+        async with self.SessionLocal() as session:
             return await session.scalar(select(Message).filter_by(sender_id=sender_id))
 
 
 class ForwardMessageManager:
+    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy
     async def add_forward_message(self, **kwargs) -> ForwardMessage:
-        async with AsyncSessionLocal() as session:# type: ignore
+        
+        async with self.SessionLocal() as session:
             fwd = ForwardMessage(**kwargs)
             session.add(fwd)
             await session.commit()
@@ -56,14 +83,16 @@ class ForwardMessageManager:
 
     async def get_for_contact(self, recipient_identifier: str) -> list[ForwardMessage]:
         """Возвращает все пересланные сообщения для данного контакта."""
-        async with AsyncSessionLocal() as session:# type: ignore
+        
+        async with self.SessionLocal() as session:
             result = await session.scalars(
                 select(ForwardMessage).filter_by(recipient_identifier=recipient_identifier)
             )
             return result.all()
 
     async def delete_forward_message(self, recipient_identifier: str) -> bool:
-        async with AsyncSessionLocal() as session:# type: ignore
+        
+        async with self.SessionLocal() as session:
             fwd = await session.scalar(select(ForwardMessage).filter_by(recipient_identifier=recipient_identifier))
             if fwd:
                 await session.delete(fwd)
@@ -71,3 +100,46 @@ class ForwardMessageManager:
                 return True
             return False
 
+class Database(ContactManager, MessageManager, ForwardMessageManager, SeenHistoryManager):
+
+    """Общий класс, объединяющий менеджеры и управление соединением."""
+
+    def __init__(self, url: str = "sqlite+aiosqlite:///zerotrace.db", echo: bool = False):
+        self.engine = create_async_engine(url, echo=echo)
+        self.SessionLocal = sessionmaker(
+            bind=self.engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+
+    async def init(self):
+        """Создать все таблицы и триггеры."""
+        async with self.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            await self._create_triggers()
+
+    async def _create_triggers(self):
+        async with self.engine.begin() as conn:
+            # Очистка seen_history старше 1 дня
+            await conn.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS delete_old_history
+            AFTER INSERT ON seen_history
+            BEGIN
+                DELETE FROM seen_history
+                WHERE timestamp < datetime('now', '-1 day');
+            END;
+            """))
+
+            # Очистка forward_messages старше 7 дней
+            await conn.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS delete_old_forward_messages
+            AFTER INSERT ON forward_messages
+            BEGIN
+                DELETE FROM forward_messages
+                WHERE created_at < datetime('now', '-7 days');
+            END;
+            """))
+
+    async def close(self):
+        """Закрыть соединение с базой."""
+        await self.engine.dispose()

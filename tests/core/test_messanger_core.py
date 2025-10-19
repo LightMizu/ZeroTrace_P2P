@@ -1,23 +1,20 @@
 import pytest
-from unittest.mock import patch
 import time
-import json
-from typing import Dict
 from zerotrace.core.messenger_core import SecureMessenger
-from zerotrace.core.utils import b64_enc
+
 
 
 @pytest.fixture
 def secure_messenger():
     """Create SecureMessenger instance with generated keys"""
-    messenger = SecureMessenger()
+    messenger = SecureMessenger(ip="")
     messenger.generate_keys()
     return messenger
 
 @pytest.fixture
 def secure_messenger_client():
     """Create SecureMessenger instance with generated keys"""
-    messenger = SecureMessenger()
+    messenger = SecureMessenger(ip="")
     messenger.generate_keys()
     return messenger
 
@@ -81,8 +78,8 @@ def test_encrypt_decrypt_message(secure_messenger, secure_messenger_client):
 def test_full_message_flow():
     """Integration test for full message flow"""
     # Create two messenger instances
-    sender = SecureMessenger()
-    receiver = SecureMessenger()
+    sender = SecureMessenger(ip="")
+    receiver = SecureMessenger(ip="")
     
     # Generate keys for both
     sender.generate_keys()
@@ -100,14 +97,14 @@ def test_full_message_flow():
 
 def test_key_persistence(tmp_path):
     """Integration test for key persistence"""
-    messenger = SecureMessenger()
+    messenger = SecureMessenger(ip="")
     messenger.generate_keys()
     
     password = b"test_password"
     key_bundle = messenger.save_keys(password)
     
     # Create new instance and load keys
-    new_messenger = SecureMessenger()
+    new_messenger = SecureMessenger(ip="")
     success = new_messenger.load_keys(key_bundle, password)
     
     assert success is True
