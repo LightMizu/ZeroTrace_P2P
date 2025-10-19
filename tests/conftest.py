@@ -4,7 +4,14 @@ import pytest
 from src.zerotrace.kademlia import server as kad_server
 from src.zerotrace.kademlia import logging as zlogging
 
+import sys
+import os
 
+# Добавляем корень проекта в sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+    
 @pytest.fixture(autouse=True)
 def isolate_global_state():
     """Ensure global state doesn't leak between tests.

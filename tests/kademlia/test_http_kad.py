@@ -3,7 +3,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from src.zerotrace.kademlia.server import create_app
 from src.zerotrace.kademlia.utils import random_node_id, digest
-from .mocks import MockSQLiteStorage
+from mocks import MockSQLiteStorage
 
 
 @pytest.fixture

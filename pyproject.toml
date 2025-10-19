@@ -6,7 +6,7 @@ authors = [
     {name = "1blend.your.life1@gmail.com",email = "1blend.your.life1@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "pytest (>=8.4.2,<9.0.0)",
     "fastapi (>=0.119.0,<0.120.0)",
@@ -14,7 +14,10 @@ dependencies = [
     "pytest-asyncio (>=1.2.0,<2.0.0)",
     "uvicorn (>=0.37.0,<0.38.0)",
     "sqlalchemy (>=2.0.44,<3.0.0)",
-    "colorama (>=0.4.6,<1.0.0)"
+    "colorama (>=0.4.6,<1.0.0)",
+    "aiosqlite (>=0.21.0,<0.22.0)",
+    "cryptography (>=46.0.3,<47.0.0)",
+    "liboqs-python (>=0.14.1,<0.15.0)"
 ]
 
 [tool.poetry]
