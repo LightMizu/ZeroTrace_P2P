@@ -143,7 +143,7 @@ class ZeroTraceClient:
         # TTL: random between 8-12 (average 10, prevents tracking by hop count)
         # max_recursive: random between 3-7 (average 5, prevents pattern analysis)
         random_ttl = random.randint(8, 12)
-        random_max_recursive = random.randint(3, 7)
+        random_max_recursive = random.randint(2, 1)
         
         # Create message model
         msg_model = MessageModel(
@@ -164,6 +164,7 @@ class ZeroTraceClient:
             sender_id=self.messenger.identifier,
             recipient_id=recipient_id  # Save with recipient ID
         )
+        
         print(f"✅ Message saved to outbox")
         
         # Try to send message directly to recipient
@@ -184,6 +185,14 @@ class ZeroTraceClient:
         
         # If direct send failed, forward to all other contacts for P2P routing
         if not direct_send_success:
+
+            await self.database.add_forward_message(
+            recipient_identifier=msg_model.recipient_identifier,
+            shared_secret_ciphertext=msg_model.shared_secret_ciphertext,
+            message_ciphertext=msg_model.message_ciphertext,
+            nonce=msg_model.nonce,
+            signature = msg_model.signature # Save with recipient ID
+        )
             all_contacts = await self.database.list_contacts()
             forward_count = 0
             success_count = 0
