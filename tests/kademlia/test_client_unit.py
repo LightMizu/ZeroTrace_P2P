@@ -1,6 +1,4 @@
 import pytest
-import asyncio
-import httpx
 from types import SimpleNamespace
 
 # Import the class to test (package import)

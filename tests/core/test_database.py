@@ -1,6 +1,5 @@
 import pytest_asyncio
 import pytest
-import asyncio
 from datetime import datetime
 from sqlalchemy import text
 

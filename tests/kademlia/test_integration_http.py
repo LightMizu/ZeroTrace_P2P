@@ -218,10 +218,6 @@ def test_integration_multiple_values(mock_network):
         assert found, f"Value for key {key} not found"
 
 
-def test_integration_node_failure_recovery(mock_network):
-    """Test network recovery after node failure."""
-    clients = mock_network['clients']
-    ports = mock_network['ports']
     
 def test_replication_counts_for_various_k(tmp_path):
     """For k in [1,2,3] create a small 5-node network and record how many

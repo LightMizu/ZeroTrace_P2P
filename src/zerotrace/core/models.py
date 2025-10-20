@@ -1,6 +1,4 @@
-from time import timezone
 from sqlalchemy import Column, Float, String, Integer, func, DateTime
-from sqlalchemy.engine import create
 from sqlalchemy.orm import declarative_base
 from typing import TypedDict, Mapping, Literal
 # Базовый класс для моделей

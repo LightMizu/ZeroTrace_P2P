@@ -1,10 +1,8 @@
 import pytest
-import asyncio
 import httpx
 from types import SimpleNamespace
 from httpx import ASGITransport
 from fastapi.testclient import TestClient
-from pathlib import Path
 
 from src.zerotrace.kademlia.client import DHTClient
 from src.zerotrace.kademlia.server import create_app

@@ -17,4 +17,4 @@ def test_iter_older_than():
     s[b'k1'] = b'v1'
     s[b'k2'] = b'v2'
     # nothing older than huge age
-    assert list(s.iter_older_than(0)) == []
+    assert list(s.iter_older_than(100)) == []

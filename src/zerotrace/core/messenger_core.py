@@ -14,7 +14,6 @@ from zerotrace.core.utils import (
     b64_enc,
     key_pair_id_base64url,
 )
-from zerotrace.core.api import API
 from zerotrace.core.models import KeyBundle
 
 

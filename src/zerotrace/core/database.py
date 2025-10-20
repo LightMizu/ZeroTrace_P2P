@@ -6,7 +6,7 @@ from zerotrace.core.models import Contact, Message, ForwardMessage, SeenHistory,
 class SeenHistoryManager:
     """Менеджер для работы с таблицей seen_history."""
 
-    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy
+    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy #type: ignore
 
     async def add_entry(self, signature: str, timestamp: float | None = None) -> SeenHistory:
         """Добавляет новую запись, если такой signature ещё нет."""
@@ -25,7 +25,7 @@ class SeenHistoryManager:
             return await session.scalar(select(SeenHistory).filter_by(signature=signature))
 
 class ContactManager:
-    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy
+    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy #type: ignore
     async def add_contact(self, identifier: str, kem_public_key: str, sign_public_key: str, addr: str, name: str | None = None):
         
         async with self.SessionLocal() as session:
@@ -52,11 +52,11 @@ class ContactManager:
         
         async with self.SessionLocal() as session:
             result = await session.scalars(select(Contact))
-            return result.all()
+            return list(result.all())
 
 
 class MessageManager:
-    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy
+    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy #type: ignore
     async def add_message(self, **kwargs) -> Message:
         
         async with self.SessionLocal() as session:
@@ -69,10 +69,19 @@ class MessageManager:
         
         async with self.SessionLocal() as session:
             return await session.scalar(select(Message).filter_by(sender_id=sender_id))
+    
+    async def list_messages(self, sender_id: str | None = None) -> list[Message]:
+        """List all messages, optionally filtered by sender_id."""
+        async with self.SessionLocal() as session:
+            if sender_id:
+                result = await session.scalars(select(Message).filter_by(sender_id=sender_id))
+            else:
+                result = await session.scalars(select(Message))
+            return list(result.all())
 
 
 class ForwardMessageManager:
-    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy
+    SessionLocal: "sessionmaker[AsyncSession]"  # для типизации Pyright/MyPy #type: ignore
     async def add_forward_message(self, **kwargs) -> ForwardMessage:
         
         async with self.SessionLocal() as session:
@@ -88,7 +97,7 @@ class ForwardMessageManager:
             result = await session.scalars(
                 select(ForwardMessage).filter_by(recipient_identifier=recipient_identifier)
             )
-            return result.all()
+            return list(result.all())
 
     async def delete_forward_message(self, recipient_identifier: str) -> bool:
         
@@ -107,10 +116,10 @@ class Database(ContactManager, MessageManager, ForwardMessageManager, SeenHistor
     def __init__(self, url: str = "sqlite+aiosqlite:///zerotrace.db", echo: bool = False):
         self.engine = create_async_engine(url, echo=echo)
         self.SessionLocal = sessionmaker(
-            bind=self.engine,
+            bind=self.engine, #type: ignore
             class_=AsyncSession,
             expire_on_commit=False,
-        )
+        ) #type: ignore
 
     async def init(self):
         """Создать все таблицы и триггеры."""

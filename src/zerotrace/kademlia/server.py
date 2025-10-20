@@ -1,4 +1,3 @@
-from operator import add
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
@@ -227,6 +226,7 @@ def create_app(address: str = "127.0.0.1", port: int = 8000, db_path: Optional[s
         # when available (helps TestClient-based bootstrapping).
         if req.port in _app_cache:
             real = _app_cache.get(req.port)
+            assert isinstance(real,Server)
             try:
                 nid = real.node.id
             except Exception:
@@ -238,6 +238,7 @@ def create_app(address: str = "127.0.0.1", port: int = 8000, db_path: Optional[s
         if req.port in _app_cache:
             try:
                 target = _app_cache.get(req.port)
+                assert isinstance(target,Server)
                 target.welcome_if_new(svr.node)
                 if default_logger:
                     default_logger.log("BOOTSTRAP_SYMMETRIC", group="Debug", operation="bootstrap_symmetric", node_id=svr.node.id.hex(), target_id=target.node.id.hex(), target_port=req.port)

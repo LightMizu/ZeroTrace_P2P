@@ -1,5 +1,5 @@
 import httpx
-from typing import Optional, List, Tuple, Union, Set
+from typing import Optional, Union, Set
 
 
 class DHTClient:
