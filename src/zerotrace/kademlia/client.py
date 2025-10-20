@@ -17,6 +17,74 @@ class DHTClient:
         r.raise_for_status()
         return r.json()["id"]
 
+    async def bootstrap(self, target_host: str, target_port: int, symmetric: bool = True) -> bool:
+        """Bootstrap this node to a known node in the DHT network.
+        
+        Args:
+            target_host: IP address or hostname of the bootstrap node
+            target_port: Port of the bootstrap node
+            symmetric: If True, also tell the target to add us (bidirectional)
+            
+        Returns:
+            True if bootstrap succeeded, False otherwise
+        """
+        try:
+            # Get our own node ID and connection info
+            our_node_id = await self.get_id()
+            
+            # Parse our own host and port from base_url
+            # base_url format: http://host:port
+            our_url_parts = self.base_url.replace('http://', '').replace('https://', '').split(':')
+            our_host = our_url_parts[0] if len(our_url_parts) > 0 else '127.0.0.1'
+            our_port = int(our_url_parts[1]) if len(our_url_parts) > 1 else 8000
+            
+            # Get target node's ID
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(f"http://{target_host}:{target_port}/id", timeout=5.0)
+                resp.raise_for_status()
+                target_node_id = resp.json()["id"]
+            
+            # Send bootstrap request to target (we want to add them)
+            payload = {
+                "node_id": target_node_id,
+                "ip": target_host,
+                "port": target_port,
+                "key": "",
+                "value": ""
+            }
+            result = await self._post("/bootstrap", json=payload)
+            
+            if not result.get("ok", False):
+                return False
+            
+            # Symmetric bootstrap: ask target to add us too
+            if symmetric:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        symmetric_payload = {
+                            "node_id": our_node_id,
+                            "ip": our_host,
+                            "port": our_port,
+                            "key": "",
+                            "value": ""
+                        }
+                        resp = await client.post(
+                            f"http://{target_host}:{target_port}/bootstrap",
+                            json=symmetric_payload,
+                            timeout=5.0
+                        )
+                        resp.raise_for_status()
+                        # Both nodes now know each other
+                except Exception as e:
+                    # Log but don't fail - we still added them to our routing table
+                    print(f"Symmetric bootstrap warning: {e}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Bootstrap failed: {e}")
+            return False
+
     async def find_value_recursive(
         self,
         node_id: str,

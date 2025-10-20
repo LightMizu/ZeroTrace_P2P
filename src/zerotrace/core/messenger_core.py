@@ -108,7 +108,7 @@ class SecureMessenger:
         return True
 
     def encrypt_message(
-        self, recipient_kem_public_key: bytes, message: bytes, timestamp: float
+        self, recipient_identifier:str, recipient_kem_public_key: bytes, message: bytes, timestamp: float
     ) -> Dict:
         #Шаг 0: Подготовка сообщения
         message_payload = json.dumps(
@@ -141,7 +141,7 @@ class SecureMessenger:
 
 
         return {
-            "recipient_identifier":b64_enc(recipient_kem_public_key),
+            "recipient_identifier":recipient_identifier,
             "shared_secret_ciphertext":b64_enc(shared_secret_kem_ciphertext),
             "message_ciphertext":b64_enc(msg_ciphertext),
             "nonce":b64_enc(msg_nonce),

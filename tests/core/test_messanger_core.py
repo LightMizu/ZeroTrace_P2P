@@ -89,7 +89,7 @@ def test_full_message_flow():
     message = b"integration test message"
     timestamp = time.time()
     
-    success = sender.encrypt_message(
+    success = sender.encrypt_message("123",
         receiver_pub_key, message, timestamp
     )
     result = receiver.decrypt_message(success)

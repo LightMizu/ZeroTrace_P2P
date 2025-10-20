@@ -2,57 +2,212 @@ from fastapi import FastAPI
 from zerotrace.core.scheme import MessageModel
 from zerotrace.core.messenger_core import SecureMessenger
 from zerotrace.core.database import Database
+from zerotrace.kademlia.logging import init_logger, default_logger
 import asyncio
 import httpx
-database = Database()
+import logging
+import random
+
+# Setup Python logging for debug/trace
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('zerotrace_router.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Removed global database instance - will be passed as parameter
 async def forward_message_task(forward_message, message, database):
     """Фоновая задача для пересылки сообщения"""
+    logger.info(f"[FORWARD_TASK] Starting forward task for message to {message.recipient_identifier}")
+    logger.info(f"[FORWARD_TASK] TTL: {forward_message.ttl}, Max recursive: {forward_message.max_recursive_contact}")
+    
     if forward_message.ttl > 0 and forward_message.max_recursive_contact > 0:
         contacts = await database.list_contacts()
+        logger.info(f"[FORWARD_TASK] Found {len(contacts)} contacts to forward to")
 
         async with httpx.AsyncClient() as client:
             for contact in contacts:
-                if contact["identifier"] == message.current_node_identifier:
+                if contact.identifier == message.current_node_identifier:
+                    logger.info(f"[FORWARD_TASK] Skipping sender node: {contact.identifier}")
                     continue
 
+                logger.info(f"[FORWARD_TASK] Attempting to forward to {contact.name or contact.identifier} at {contact.addr}")
                 try:
                     resp = await client.post(
-                        contact["addr"] + "/send",
+                        contact.addr + "/send",
                         json=forward_message.model_dump(),
                         timeout=5.0
                     )
                     resp.raise_for_status()
+                    logger.info(f"[FORWARD_TASK] Successfully forwarded to {contact.addr}")
+                    
+                    if default_logger:
+                        default_logger.log("FORWARD_SUCCESS", 
+                                         group="Routing", 
+                                         target=contact.identifier[:8],
+                                         addr=contact.addr)
                 except httpx.HTTPError as e:
-                    # Можно добавить логирование
-                    print(f"[WARN] Не удалось отправить {contact['addr']}: {e}")
+                    logger.warning(f"[FORWARD_TASK] Failed to forward to {contact.addr}: {e}")
+                    
+                    if default_logger:
+                        default_logger.log("FORWARD_FAILED", 
+                                         group="Routing", 
+                                         target=contact.identifier[:8],
+                                         error=str(e)[:50])
                 else:
-                    if contact["identifier"] == message.recipient_identifier:
+                    if contact.identifier == message.recipient_identifier:
+                        logger.info(f"[FORWARD_TASK] Message delivered to final recipient: {contact.identifier}")
                         await database.delete_forward_message(message.recipient_identifier)
                         return
-def add_routers(app: FastAPI, messanger: SecureMessenger) -> FastAPI:
+    else:
+        logger.warning(f"[FORWARD_TASK] Message dropped - TTL={forward_message.ttl}, Max recursive={forward_message.max_recursive_contact}")
+def add_routers(app: FastAPI, messanger: SecureMessenger, database: Database) -> FastAPI:
+    logger.info(f"[INIT] Adding routers for messenger with ID: {messanger.identifier}")
+    
     @app.post("/send")
     async def send_message(message: MessageModel):
+        logger.info(f"[RECEIVE] Incoming message - Signature: {message.signature[:16]}...")
+        logger.info(f"[RECEIVE] Recipient: {message.recipient_identifier[:16]}..., Current node: {message.current_node_identifier[:16]}..., TTL: {message.ttl}")
+        
+        if default_logger:
+            default_logger.log("MSG_RECEIVED", 
+                             group="Messaging", 
+                             signature=message.signature[:8],
+                             ttl=message.ttl)
+        
+        # Check if we've seen this message before (prevent loops)
         if await database.get_entry(message.signature):
+            logger.info(f"[RECEIVE] Message already seen (signature: {message.signature[:16]}...), ignoring")
+            
+            if default_logger:
+                default_logger.log("MSG_DUPLICATE", 
+                                 group="Messaging", 
+                                 signature=message.signature[:8])
             return {"status": "OK"}
+        
+        # Mark message as seen
         await database.add_entry(message.signature)
+        logger.info(f"[RECEIVE] Marked message as seen")
+        
+        # Check if message is for this node
         if message.recipient_identifier == messanger.identifier:
-            msg = messanger.decrypt_message(message.model_dump())
-            if database.get_contact(msg["sender_id"]) is None:
-                await database.add_contact(identifier=msg["sender_id"], kem_public_key=msg["kem_public_key"], sign_public_key=msg["signature_public_key"], addr=msg["sender_dest"])
-            await database.add_message(content=msg["message"],timestamp=msg["timestamp"],sender_id=msg["sender_id"])
-            return {"status": "OK"}
+            logger.info(f"[RECEIVE] Message is for this node, decrypting...")
+            
+            if default_logger:
+                default_logger.log("MSG_FOR_ME", 
+                                 group="Messaging", 
+                                 signature=message.signature[:8])
+            
+            try:
+                msg = messanger.decrypt_message(message.model_dump())
+                logger.info(f"[DECRYPT] Successfully decrypted message from {msg['sender_id'][:16]}...")
+                
+                if default_logger:
+                    default_logger.log("DECRYPT_SUCCESS", 
+                                     group="Messaging", 
+                                     sender=msg['sender_id'][:8])
+                
+                # Add sender as contact if not exists
+                if await database.get_contact(msg["sender_id"]) is None:
+                    logger.info(f"[CONTACT] Adding new contact: {msg['sender_id'][:16]}...")
+                    await database.add_contact(
+                        identifier=msg["sender_id"], 
+                        kem_public_key=msg["kem_public_key"], 
+                        sign_public_key=msg["signature_public_key"], 
+                        addr=msg["sender_dest"]
+                    )
+                    
+                    if default_logger:
+                        default_logger.log("CONTACT_ADDED", 
+                                         group="Contacts", 
+                                         contact_id=msg["sender_id"][:8])
+                else:
+                    logger.info(f"[CONTACT] Sender already in contacts")
+                
+                # Save message with sender_id and recipient_id
+                await database.add_message(
+                    content=msg["message"],
+                    timestamp=msg["timestamp"],
+                    sender_id=msg["sender_id"],
+                    recipient_id=messanger.identifier  # Save recipient ID for self-messages
+                )
+                logger.info(f"[STORAGE] Message saved to database")
+                
+                if default_logger:
+                    default_logger.log("MSG_STORED", 
+                                     group="Storage", 
+                                     sender=msg["sender_id"][:8],
+                                     recipient=messanger.identifier[:8])
+                
+                return {"status": "OK"}
+            except Exception as e:
+                logger.error(f"[DECRYPT] Failed to decrypt message: {e}")
+                
+                if default_logger:
+                    default_logger.log("DECRYPT_FAILED", 
+                                     group="Messaging", 
+                                     error=str(e)[:50])
+                return {"status": "ERROR", "message": "Decryption failed"}
+        
+        # Message is not for this node, prepare to forward
+        logger.info(f"[FORWARD] Message not for this node, preparing to forward")
+        
+        if default_logger:
+            default_logger.log("MSG_FORWARD", 
+                             group="Routing", 
+                             recipient=message.recipient_identifier[:8],
+                             ttl=message.ttl)
+        
         forward_message = message.model_copy()
-        if database.get_contact(message.recipient_identifier):
-            await database.add_forward_message(recipient_identifier=message.recipient_identifier, shared_secret_ciphertext=message.shared_secret_ciphertext, message_ciphertext=message.message_ciphertext, nonce=message.nonce, signature=message.signature)
-            forward_message.max_recursive_contact -= 1
+        
+        # Check if we know the recipient
+        if await database.get_contact(message.recipient_identifier):
+            logger.info(f"[FORWARD] Recipient in contacts, saving forward message")
+            await database.add_forward_message(
+                recipient_identifier=message.recipient_identifier, 
+                shared_secret_ciphertext=message.shared_secret_ciphertext, 
+                message_ciphertext=message.message_ciphertext, 
+                nonce=message.nonce, 
+                signature=message.signature
+            )
+            # Random decrement for max_recursive_contact (0-2) for traffic analysis protection
+            random_decrement_recursive = random.randint(0, 2)
+            forward_message.max_recursive_contact -= random_decrement_recursive
+            logger.info(f"[FORWARD] Max recursive contacts decremented by {random_decrement_recursive} to {forward_message.max_recursive_contact}")
+        else:
+            logger.info(f"[FORWARD] Recipient not in contacts, flooding mode")
+        
+        # Update current node identifier
         forward_message.current_node_identifier = messanger.identifier
-        # Decrement TTL
-        forward_message.ttl -= 1
-        # Запускаем пересылку в отдельной асинхронной задаче
+        
+        # Random decrement for TTL (0-2) for traffic analysis protection
+        # This prevents observers from calculating exact distance to origin
+        random_decrement_ttl = random.randint(0, 2)
+        forward_message.ttl -= random_decrement_ttl
+        logger.info(f"[FORWARD] TTL decremented by {random_decrement_ttl} to {forward_message.ttl}")
+        
+        # Launch forwarding task in background
         asyncio.create_task(forward_message_task(forward_message, message, database))
+        logger.info(f"[FORWARD] Background forwarding task started")
+        
         return {"status": "OK"}
+    
     @app.post("/get_messages/{identifier}")
     async def get_messages(identifier: str):
+        logger.info(f"[API] Getting forwarded messages for identifier: {identifier[:16]}...")
+        
+        if default_logger:
+            default_logger.log("GET_MESSAGES", 
+                             group="API", 
+                             identifier=identifier[:8])
+        
         messages = await database.get_for_contact(identifier)
+        logger.info(f"[API] Found {len(messages)} forwarded messages")
+        
         return {"messages": messages}
+    
     return app

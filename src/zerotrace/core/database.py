@@ -124,8 +124,31 @@ class Database(ContactManager, MessageManager, ForwardMessageManager, SeenHistor
     async def init(self):
         """Создать все таблицы и триггеры."""
         async with self.engine.begin() as conn:
+            # First, create all tables
             await conn.run_sync(Base.metadata.create_all)
+            # Then, migrate schema for any missing columns
+            await self._migrate_schema(conn)
+            # Finally, create triggers
             await self._create_triggers()
+
+    async def _migrate_schema(self, conn):
+        """Migrate database schema to add missing columns."""
+        try:
+            # Check if recipient_id column exists in messages table
+            result = await conn.execute(text(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='messages'"
+            ))
+            table_sql = result.scalar()
+            
+            if table_sql and "recipient_id" not in table_sql:
+                # Add recipient_id column if it doesn't exist
+                await conn.execute(text(
+                    "ALTER TABLE messages ADD COLUMN recipient_id VARCHAR"
+                ))
+                print("[DB] ✅ Migration: Added recipient_id column to messages table")
+        except Exception:
+            # Table might not exist yet or column already exists, ignore
+            pass
 
     async def _create_triggers(self):
         async with self.engine.begin() as conn:

@@ -30,6 +30,7 @@ class Message(Base):
     content = Column(String, nullable=False)
     timestamp = Column(String, nullable=False)
     sender_id = Column(String, nullable=False)
+    recipient_id = Column(String, nullable=True)  # For self-sent messages
 
 
 class ForwardMessage(Base):
