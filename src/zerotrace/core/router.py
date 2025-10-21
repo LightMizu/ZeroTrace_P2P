@@ -1,3 +1,4 @@
+from functools import total_ordering
 from fastapi import FastAPI
 from zerotrace.core.scheme import MessageModel
 from zerotrace.core.messenger_core import SecureMessenger
@@ -27,14 +28,35 @@ async def forward_message_task(forward_message, message, database):
     
     if forward_message.ttl > 0 and forward_message.max_recursive_contact > 0:
         contacts = await database.list_contacts()
-        logger.info(f"[FORWARD_TASK] Found {len(contacts)} contacts to forward to")
+        logger.info(f"[FORWARD_TASK] Found {len(contacts)} total contacts")
+        
+        # Filter out sender node
+        eligible_contacts = [
+            c for c in contacts 
+            if c.identifier != message.current_node_identifier
+        ]
+        
+        if not eligible_contacts:
+            logger.warning(f"[FORWARD_TASK] No eligible contacts for forwarding")
+            return
+        total_contacts = len(eligible_contacts)
+        # Random node selection for privacy and efficiency
+        # Select 30%-100% of contacts, max 10 nodes
+        min_contacts = max(1, int(total_contacts * 0.3))
+        max_contacts = int(total_contacts * 0.7)
+        num_contacts = random.randint(min_contacts, max_contacts)
+        
+        selected_contacts = random.sample(eligible_contacts, num_contacts)
+        
+        logger.info(f"[FORWARD_TASK] Randomly selected {num_contacts}/{len(eligible_contacts)} contacts for forwarding")
+        if default_logger:
+            default_logger.log("RANDOM_SELECT", 
+                             group="Routing", 
+                             selected=num_contacts,
+                             total=len(eligible_contacts))
 
         async with httpx.AsyncClient() as client:
-            for contact in contacts:
-                if contact.identifier == message.current_node_identifier:
-                    logger.info(f"[FORWARD_TASK] Skipping sender node: {contact.identifier}")
-                    continue
-
+            for contact in selected_contacts:
                 logger.info(f"[FORWARD_TASK] Attempting to forward to {contact.name or contact.identifier} at {contact.addr}")
                 try:
                     resp = await client.post(
@@ -154,7 +176,7 @@ def add_routers(app: FastAPI, messanger: SecureMessenger, database: Database) ->
                 return {"status": "ERROR", "message": "Decryption failed"}
         
         # Message is not for this node, prepare to forward
-        logger.info(f"[FORWARD] Message not for this node, preparing to forward")
+        logger.info(f"[FORWARD] Message not for this node, preparing to forward with random node selection")
         
         if default_logger:
             default_logger.log("MSG_FORWARD", 

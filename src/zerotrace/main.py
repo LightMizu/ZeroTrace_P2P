@@ -21,13 +21,16 @@ from zerotrace.core.utils import b64_dec, b64_enc
 from zerotrace.core.post_quantum.sign import PostQuantumSignature
 from zerotrace.kademlia import create_app
 from zerotrace.kademlia.client import DHTClient
+from zerotrace.i2p_manager import I2PManager
 import hashlib
 
 
 class ZeroTraceClient:
     """CLI Client for ZeroTrace Messenger"""
     
-    def __init__(self, host: str = "0.0.0.0", port: int = 8000, data_dir: str = "."):
+    def __init__(self, host: str = "0.0.0.0", port: int = 8000, data_dir: str = ".", 
+                 start_i2p: bool = True, i2pd_path: str = "i2pd.exe", 
+                 tunnels_conf: str = "tunnels.conf"):
         self.host = host
         self.port = port
         self.data_dir = Path(data_dir)
@@ -43,14 +46,54 @@ class ZeroTraceClient:
         self.is_running = False
         self.dht_client: Optional[DHTClient] = None
         self.signature_verifier = PostQuantumSignature()
+        
+        # I2P Manager
+        self.start_i2p = start_i2p
+        self.i2p_manager: Optional[I2PManager] = None
+        self.i2p_destination: Optional[str] = None
+        if start_i2p:
+            try:
+                self.i2p_manager = I2PManager(i2pd_path=i2pd_path, tunnels_conf=tunnels_conf)
+            except FileNotFoundError as e:
+                print(f"⚠️  {e}")
+                print(f"   Continuing without I2P (NOT RECOMMENDED for production)")
+                self.start_i2p = False
 
     async def initialize(self):
         """Initialize database and messenger"""
+        # Start I2P router if enabled
+        if self.start_i2p and self.i2p_manager:
+            print("\n" + "="*60)
+            print("🔧 I2P ROUTER SETUP")
+            print("="*60)
+            
+            if self.i2p_manager.start(wait_time=10):
+                # Try to get I2P destination
+                destination = self.i2p_manager.get_destination()
+                
+                if not destination:
+                    # Ask user to provide it manually
+                    destination = self.i2p_manager.get_destination_manual()
+                
+                self.i2p_destination = destination
+                
+                print("\n" + "="*60)
+                print("✅ I2P ROUTER READY")
+                print("="*60)
+                print(f"   Your I2P destination: {self.i2p_destination}")
+                print(f"   HTTP Proxy: http://{self.i2p_manager.get_proxy_settings()[0]}:{self.i2p_manager.get_proxy_settings()[1]}")
+                print("="*60)
+            else:
+                print("\n❌ Failed to start I2P router")
+                print("   Continuing without I2P (NOT RECOMMENDED)\n")
+                self.start_i2p = False
+        
         self.database = Database(url=f"sqlite+aiosqlite:///{self.db_path}")
         await self.database.init()
         
-        # Initialize messenger
-        self.messenger = SecureMessenger(ip=f"http://{self.host}:{self.port}")
+        # Initialize messenger with I2P destination if available
+        messenger_addr = f"http://{self.i2p_destination}" if self.i2p_destination else f"http://{self.host}:{self.port}"
+        self.messenger = SecureMessenger(ip=messenger_addr)
         
         # Load or create keys
         if self.keys_file.exists():
@@ -298,12 +341,17 @@ class ZeroTraceClient:
         assert self.messenger is not None
         
         print("\n📋 Your Information:")
-        print("=" * 80)
+        print("="*80)
         print(f"Identifier: {self.messenger.identifier}")
-        print(f"Server: http://{self.host}:{self.port}")
+        print(f"Server (Local): http://{self.host}:{self.port}")
+        if self.i2p_destination:
+            print(f"Server (I2P): http://{self.i2p_destination}")
+            print(f"I2P Status: ✅ Running")
+        else:
+            print(f"I2P Status: ❌ Not running (INSECURE!)")
         print(f"KEM Public Key: {b64_enc(self.messenger.kem_public_key)}")
         print(f"Sign Public Key: {b64_enc(self.messenger.signature_public_key)}")
-        print("=" * 80)
+        print("="*80)
 
     def _sign_address(self, address: str) -> str:
         """Sign an address with the user's signature key"""
@@ -660,6 +708,9 @@ async def main():
     parser.add_argument("--port", type=int, default=8000, help="Server port (default: 8000)")
     parser.add_argument("--data-dir", default=".", help="Data directory (default: current dir)")
     parser.add_argument("--server-only", action="store_true", help="Run server only without CLI")
+    parser.add_argument("--no-i2p", action="store_true", help="Disable I2P router (INSECURE!)")
+    parser.add_argument("--i2pd-path", default="i2pd.exe", help="Path to i2pd executable")
+    parser.add_argument("--tunnels-conf", default="tunnels.conf", help="Path to tunnels.conf")
     
     args = parser.parse_args()
     
@@ -672,7 +723,14 @@ async def main():
 ╚═══════════════════════════════════════════════════════════╝
     """)
     
-    client = ZeroTraceClient(host=args.host, port=args.port, data_dir=args.data_dir)
+    client = ZeroTraceClient(
+        host=args.host, 
+        port=args.port, 
+        data_dir=args.data_dir,
+        start_i2p=not args.no_i2p,
+        i2pd_path=args.i2pd_path,
+        tunnels_conf=args.tunnels_conf
+    )
     
     # Initialize
     await client.initialize()
@@ -699,6 +757,9 @@ async def main():
             await client.database.close()
         if client.dht_client:
             await client.dht_client.close()
+        if client.i2p_manager and client.start_i2p:
+            print("\n🛑 Stopping I2P router...")
+            client.i2p_manager.stop()
 
 
 if __name__ == "__main__":

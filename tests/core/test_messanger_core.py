@@ -55,7 +55,7 @@ def test_send_message(secure_messenger):
     message = b"test message"
     timestamp = time.time()
 
-    result = secure_messenger.encrypt_message(
+    result = secure_messenger.encrypt_message("ind",
         recipient_key, message, timestamp
     )
 
@@ -64,7 +64,7 @@ def test_send_message(secure_messenger):
 def test_encrypt_decrypt_message(secure_messenger, secure_messenger_client):
     """Test message decryption"""
     message: bytes = b"Hello World"
-    result = secure_messenger.encrypt_message(
+    result = secure_messenger.encrypt_message("123",
         secure_messenger_client.kem_public_key, message, 0
     )
     print(  result)
