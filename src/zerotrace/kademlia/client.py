@@ -1,11 +1,19 @@
-import httpx
 from typing import Optional, Union, Set
+from ..core.http_client import create_http_client
 
 
 class DHTClient:
     def __init__(self, host: str = "127.0.0.1", port: int = 8000):
         self.base_url = f"http://{host}:{port}"
-        self._client = httpx.AsyncClient(base_url=self.base_url)
+        self.host = host
+        self.port = port
+        # Automatically detect if we need I2P proxy based on host
+        # Localhost always uses direct connection
+        is_localhost = host in ['127.0.0.1', 'localhost', '::1', '0.0.0.0']
+        self._client = create_http_client(
+            base_url=self.base_url, 
+            force_direct=is_localhost
+        )
 
     async def _post(self, path: str, json: dict):
         r = await self._client.post(path, json=json, timeout=10.0)
@@ -21,13 +29,16 @@ class DHTClient:
         """Bootstrap this node to a known node in the DHT network.
         
         Args:
-            target_host: IP address or hostname of the bootstrap node
+            target_host: IP address or hostname of the bootstrap node (can be .i2p address)
             target_port: Port of the bootstrap node
             symmetric: If True, also tell the target to add us (bidirectional)
             
         Returns:
             True if bootstrap succeeded, False otherwise
         """
+        # Check if this is an I2P destination
+        is_i2p = target_host.lower().endswith('.i2p')
+        
         try:
             # Get our own node ID and connection info
             our_node_id = await self.get_id()
@@ -38,11 +49,21 @@ class DHTClient:
             our_host = our_url_parts[0] if len(our_url_parts) > 0 else '127.0.0.1'
             our_port = int(our_url_parts[1]) if len(our_url_parts) > 1 else 8000
             
+            # Construct target URL (let the http_client auto-detect I2P vs direct)
+            target_url = f"http://{target_host}:{target_port}"
+            
+            if is_i2p:
+                print(f"   I2P destination detected - routing through proxy at 127.0.0.1:4444")
+            
             # Get target node's ID
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(f"http://{target_host}:{target_port}/id", timeout=5.0)
+            # The create_http_client will automatically use I2P proxy for .i2p domains
+            # and direct connection for localhost/regular IPs
+            print(f"   Attempting to contact {target_url}/id...")
+            async with create_http_client(base_url=target_url, timeout=30.0) as client:
+                resp = await client.get("/id", timeout=30.0)
                 resp.raise_for_status()
                 target_node_id = resp.json()["id"]
+                print(f"   ✓ Got target node ID: {target_node_id[:16]}...")
             
             # Send bootstrap request to target (we want to add them)
             payload = {
@@ -60,7 +81,7 @@ class DHTClient:
             # Symmetric bootstrap: ask target to add us too
             if symmetric:
                 try:
-                    async with httpx.AsyncClient() as client:
+                    async with create_http_client(base_url=target_url, timeout=30.0) as client:
                         symmetric_payload = {
                             "node_id": our_node_id,
                             "ip": our_host,
@@ -69,20 +90,26 @@ class DHTClient:
                             "value": ""
                         }
                         resp = await client.post(
-                            f"http://{target_host}:{target_port}/bootstrap",
+                            "/bootstrap",
                             json=symmetric_payload,
-                            timeout=5.0
+                            timeout=30.0
                         )
                         resp.raise_for_status()
                         # Both nodes now know each other
                 except Exception as e:
                     # Log but don't fail - we still added them to our routing table
-                    print(f"Symmetric bootstrap warning: {e}")
+                    print(f"   ⚠️  Symmetric bootstrap warning: {e}")
             
             return True
             
         except Exception as e:
-            print(f"Bootstrap failed: {e}")
+            import traceback
+            print(f"   ❌ Bootstrap error details: {type(e).__name__}: {e}")
+            if is_i2p:
+                print(f"   Possible causes:")
+                print(f"   • I2P proxy (127.0.0.1:4444) may not be running")
+                print(f"   • Target I2P destination may be unreachable")
+                print(f"   • I2P tunnel may not be ready yet")
             return False
 
     async def find_value_recursive(
@@ -124,7 +151,9 @@ class DHTClient:
             if url in visited:
                 continue
             try:
-                async with httpx.AsyncClient(base_url=url) as client:
+                # Auto-detect if we need I2P proxy based on IP/hostname
+                # Will automatically use proxy for .i2p domains, direct for localhost
+                async with create_http_client(base_url=url) as client:
                     payload = {"node_id": node_id, "key": key_hex, "ip": ip, "port": port}
                     res = await client.post("/find_value", json=payload, timeout=5.0)
                     data = res.json()
@@ -134,6 +163,7 @@ class DHTClient:
                         except Exception:
                             return data["value"]
                     if depth < max_depth and "nodes" in data:
+                        # Create new DHTClient for neighbor - auto-detection will work
                         next_client = DHTClient(ip, port)
                         val = await next_client.find_value_recursive(
                             node_id, key_hex, visited=visited, depth=depth + 1

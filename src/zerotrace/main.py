@@ -19,6 +19,7 @@ from src.zerotrace.core.router import add_routers
 from src.zerotrace.core.scheme import MessageModel
 from src.zerotrace.core.utils import b64_dec, b64_enc
 from src.zerotrace.core.post_quantum.sign import PostQuantumSignature
+from src.zerotrace.core.http_client import ZeroTraceHTTPClient, create_http_client
 from src.zerotrace.kademlia import create_app
 from src.zerotrace.kademlia.client import DHTClient
 from src.zerotrace.i2p_manager import I2PManager
@@ -213,7 +214,8 @@ class ZeroTraceClient:
         # Try to send message directly to recipient
         direct_send_success = False
         try:
-            async with httpx.AsyncClient() as client:
+            # Use auto-proxy client (will use I2P proxy for .i2p addresses)
+            async with create_http_client() as client:
                 resp = await client.post(
                     f"{contact.addr}/send",
                     json=msg_model.model_dump(),
@@ -240,7 +242,8 @@ class ZeroTraceClient:
             forward_count = 0
             success_count = 0
             
-            async with httpx.AsyncClient() as client:
+            # Use auto-proxy client for forwarding
+            async with create_http_client() as client:
                 for other_contact in all_contacts:
                     # Skip the recipient (already failed) and self
                     if str(other_contact.identifier) == recipient_id or str(other_contact.identifier) == self.messenger.identifier:
@@ -411,7 +414,7 @@ class ZeroTraceClient:
             key_hash = hashlib.sha256(self.messenger.identifier.encode()).hexdigest()
             
             # Publish to DHT via HTTP endpoint
-            async with httpx.AsyncClient() as client:
+            async with create_http_client() as client:
                 resp = await client.post(
                     f"http://{messenger_host}:{self.port}/set",
                     json={
@@ -509,7 +512,8 @@ class ZeroTraceClient:
         total_messages = 0
         successful_contacts = 0
         
-        async with httpx.AsyncClient() as client:
+        # Use auto-proxy client for fetching messages
+        async with create_http_client() as client:
             for contact in contacts:
                 try:
                     # Request pending messages from this contact
@@ -580,11 +584,17 @@ class ZeroTraceClient:
         print("\n🔗 Bootstrap to DHT Network")
         print("=" * 60)
         print("Enter the address of a known node to connect to:")
+        print("(For I2P addresses, enter just the hostname without http://)")
         
-        target_host = input("Host (e.g., 127.0.0.1 or example.com): ").strip()
+        target_host = input("Host (e.g., 127.0.0.1 or example.b32.i2p): ").strip()
         if not target_host:
             print("❌ Host cannot be empty")
             return
+        
+        # Strip http:// or https:// prefix if user provided it
+        target_host = target_host.replace('http://', '').replace('https://', '')
+        # Remove trailing slashes
+        target_host = target_host.rstrip('/')
         
         target_port = input("Port (e.g., 8000): ").strip()
         if not target_port:

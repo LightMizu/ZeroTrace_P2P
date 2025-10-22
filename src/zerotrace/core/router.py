@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from src.zerotrace.core.scheme import MessageModel
 from src.zerotrace.core.messenger_core import SecureMessenger
 from src.zerotrace.core.database import Database
+from src.zerotrace.core.http_client import create_http_client
 from src.zerotrace.kademlia.logging import init_logger, default_logger
 import asyncio
 import httpx
@@ -55,7 +56,8 @@ async def forward_message_task(forward_message, message, database):
                              selected=num_contacts,
                              total=len(eligible_contacts))
 
-        async with httpx.AsyncClient() as client:
+        # Use auto-proxy client - will detect I2P destinations and route through proxy
+        async with create_http_client() as client:
             for contact in selected_contacts:
                 logger.info(f"[FORWARD_TASK] Attempting to forward to {contact.name or contact.identifier} at {contact.addr}")
                 try:

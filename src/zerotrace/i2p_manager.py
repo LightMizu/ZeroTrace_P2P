@@ -132,6 +132,7 @@ class I2PManager:
             # i2pd console usually runs on http://127.0.0.1:7070
             console_url = "http://127.0.0.1:7070"
             
+            # Use direct connection (no proxy) for localhost console
             with httpx.Client(timeout=2.0) as client:
                 # Try to get SAM sessions page which shows destinations
                 resp = client.get(f"{console_url}/?page=i2p_tunnels")
