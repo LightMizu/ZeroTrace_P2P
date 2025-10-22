@@ -30,7 +30,7 @@ echo Please wait for I2P destination to be displayed
 echo.
 
 REM Start ZeroTrace (which will start i2pd internally)
-python -m zerotrace.main %*
+poetry run python -m src.zerotrace.main %*
 
 echo.
 echo ZeroTrace stopped.

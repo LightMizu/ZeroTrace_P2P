@@ -1,6 +1,6 @@
 import pytest
 import time
-from zerotrace.core.messenger_core import SecureMessenger
+from src.zerotrace.core.messenger_core import SecureMessenger
 
 
 

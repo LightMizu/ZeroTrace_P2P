@@ -1,7 +1,7 @@
 from sqlalchemy import select,text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from zerotrace.core.models import Contact, Message, ForwardMessage, SeenHistory, Base
+from src.zerotrace.core.models import Contact, Message, ForwardMessage, SeenHistory, Base
 
 class SeenHistoryManager:
     """Менеджер для работы с таблицей seen_history."""

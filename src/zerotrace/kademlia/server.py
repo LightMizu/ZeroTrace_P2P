@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 from .utils import Node, random_node_id
-from zerotrace.kademlia.logging import default_logger, init_logger
+from src.zerotrace.kademlia.logging import default_logger, init_logger
 from .persistent_storage import SQLiteStorage
 from .routing import RoutingTable
 

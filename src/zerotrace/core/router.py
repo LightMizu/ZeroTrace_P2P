@@ -1,9 +1,9 @@
 from functools import total_ordering
 from fastapi import FastAPI
-from zerotrace.core.scheme import MessageModel
-from zerotrace.core.messenger_core import SecureMessenger
-from zerotrace.core.database import Database
-from zerotrace.kademlia.logging import init_logger, default_logger
+from src.zerotrace.core.scheme import MessageModel
+from src.zerotrace.core.messenger_core import SecureMessenger
+from src.zerotrace.core.database import Database
+from src.zerotrace.kademlia.logging import init_logger, default_logger
 import asyncio
 import httpx
 import logging

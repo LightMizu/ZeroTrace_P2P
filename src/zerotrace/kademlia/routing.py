@@ -5,7 +5,7 @@ from collections import OrderedDict
 from itertools import chain
 
 from .utils import Node
-from zerotrace.kademlia.logging import default_logger
+from src.zerotrace.kademlia.logging import default_logger
 
 
 class KBucket:

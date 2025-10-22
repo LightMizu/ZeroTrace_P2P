@@ -5,16 +5,16 @@ import os
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hmac, hashes
 
-from zerotrace.core.symmetric.crypto import SymmetricCrypto
-from zerotrace.core.post_quantum.crypto import PostQuantumCrypto
-from zerotrace.core.post_quantum.sign import PostQuantumSignature
-from zerotrace.core.utils import (
+from src.zerotrace.core.symmetric.crypto import SymmetricCrypto
+from src.zerotrace.core.post_quantum.crypto import PostQuantumCrypto
+from src.zerotrace.core.post_quantum.sign import PostQuantumSignature
+from src.zerotrace.core.utils import (
     CryptoUtils,
     b64_dec,
     b64_enc,
     key_pair_id_base64url,
 )
-from zerotrace.core.models import KeyBundle
+from src.zerotrace.core.models import KeyBundle
 
 
 class SecureMessenger:

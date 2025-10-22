@@ -13,15 +13,15 @@ import httpx
 import uvicorn
 from fastapi import FastAPI
 
-from zerotrace.core.messenger_core import SecureMessenger
-from zerotrace.core.database import Database
-from zerotrace.core.router import add_routers
-from zerotrace.core.scheme import MessageModel
-from zerotrace.core.utils import b64_dec, b64_enc
-from zerotrace.core.post_quantum.sign import PostQuantumSignature
-from zerotrace.kademlia import create_app
-from zerotrace.kademlia.client import DHTClient
-from zerotrace.i2p_manager import I2PManager
+from src.zerotrace.core.messenger_core import SecureMessenger
+from src.zerotrace.core.database import Database
+from src.zerotrace.core.router import add_routers
+from src.zerotrace.core.scheme import MessageModel
+from src.zerotrace.core.utils import b64_dec, b64_enc
+from src.zerotrace.core.post_quantum.sign import PostQuantumSignature
+from src.zerotrace.kademlia import create_app
+from src.zerotrace.kademlia.client import DHTClient
+from src.zerotrace.i2p_manager import I2PManager
 import hashlib
 
 
@@ -705,7 +705,7 @@ async def main():
     
     parser = argparse.ArgumentParser(description="ZeroTrace P2P Messenger")
     parser.add_argument("--host", default="0.0.0.0", help="Server host (default: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=8000, help="Server port (default: 8000)")
+    parser.add_argument("--port", type=int, default=80, help="Server port (default: 8000)")
     parser.add_argument("--data-dir", default=".", help="Data directory (default: current dir)")
     parser.add_argument("--server-only", action="store_true", help="Run server only without CLI")
     parser.add_argument("--no-i2p", action="store_true", help="Disable I2P router (INSECURE!)")

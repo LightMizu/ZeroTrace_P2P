@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime
 from sqlalchemy import text
 
-from zerotrace.core.database import Database
+from src.zerotrace.core.database import Database
 
 
 @pytest_asyncio.fixture(scope="module")
